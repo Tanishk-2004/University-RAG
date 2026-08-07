@@ -49,7 +49,7 @@ embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-path_to_db = project_root / "chroma_dbb"
+path_to_db = project_root / "chroma_db"
 
 print(path_to_db)
 

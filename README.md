@@ -4,43 +4,43 @@ A Retrieval-Augmented Generation (RAG) system that answers university-related qu
 
 ## Overview
 
-Large Language Models (LLMs) can answer a wide range of questions, but they often struggle with information that is specific to an organization or exists only in private documents. Since this information is not part of the model's training data, responses may be incomplete or inaccurate.
+Large Language Models (LLMs) often struggle to answer questions about organization-specific information that exists only in private documents. Retrieval-Augmented Generation (RAG) addresses this by retrieving relevant information from a custom knowledge base before generating a response.
 
-This project addresses that challenge by implementing a Retrieval-Augmented Generation (RAG) system for a fictional university, **Hyderabad Institute of Technology**. Instead of relying only on the model's internal knowledge, the system retrieves relevant information from a custom knowledge base before generating a response.
+This project implements a RAG-based assistant for the fictional **Hyderabad Institute of Technology**.
 
-The knowledge base contains **20 university policy documents** spanning approximately **180 pages** and covers academic regulations, admissions, examinations, scholarships, placements, hostel policies, and other institutional information. By combining document retrieval with an LLM, the assistant generates responses that are grounded in the provided documents while reducing the likelihood of hallucinations.
+By combining document retrieval with an LLM, the assistant generates accurate, context-aware responses grounded in the provided documents while reducing hallucinations.
 
 ## Features
 
 - **Question Answering over Institutional Documents**  
-  Answers university-related questions using information retrieved from a custom knowledge base instead of relying solely on the LLM's pre-trained knowledge.
+  Answers university-related questions using information retrieved from a custom knowledge base rather than relying solely on the LLM's pre-trained knowledge.
 
 - **Custom Knowledge Base**  
-  Built on a collection of 20 university documents covering approximately 180 pages of academic policies, regulations, and administrative procedures.
+  Uses **20 university policy documents** (~**180 pages**) covering admissions, academics, examinations, scholarships, placements, hostel policies, and other institutional regulations.
 
 - **Semantic Document Retrieval**  
-  Retrieves relevant document sections based on semantic similarity rather than simple keyword matching, improving the relevance of retrieved context.
+  Retrieves the most relevant document sections using semantic similarity instead of keyword matching.
 
 - **Maximum Marginal Relevance (MMR) Retrieval**  
-  Balances relevance and diversity while retrieving document chunks, helping reduce redundant context.
+  Balances relevance and diversity to reduce redundant retrieved context.
 
 - **Multi-Query Retrieval**  
-  Automatically generates multiple variations of the user's question to improve retrieval performance for complex or ambiguous queries.
+  Generates multiple variations of a user's query to improve retrieval for complex or ambiguous questions.
 
 - **Persistent Vector Database**  
-  Stores document embeddings in a persistent Chroma database, eliminating the need to recreate embeddings every time the application starts.
+  Stores embeddings in a persistent Chroma database, avoiding repeated embedding generation.
 
 - **Grounded Response Generation**  
-  Generates answers using only the retrieved document context and returns an appropriate fallback response when the required information is unavailable.
+  Generates answers only from retrieved document context and returns a fallback response when information is unavailable.
 
 - **Automated Evaluation Pipeline**  
-  Evaluates generated responses against reference answers using a predefined dataset of 50 university-related questions.
+  Evaluates responses against a benchmark dataset of **50 university-related questions**.
 
 - **Multiple Evaluation Methods**  
-  Measures response quality using both BERTScore and an independent LLM-as-a-Judge evaluation to assess semantic accuracy and overall answer quality.
+  Assesses response quality using **BERTScore** and **LLM-as-a-Judge** evaluation.
 
 - **Modular Pipeline**  
-  Separates document processing, vector database creation, retrieval, response generation, making the system easier to maintain and extend.
+  Separates document processing, vector storage, retrieval, and response generation for easier maintenance and extensibility.
 
   ## System Architecture
 
@@ -97,9 +97,7 @@ This process is executed whenever a user submits a query.
 
 ## Knowledge Base
 
-The RAG system is built on a custom knowledge base created specifically for this project. It consists of **20 PDF documents** containing approximately **180 pages** of institutional information for the fictional **Hyderabad Institute of Technology**.
-
-The documents simulate real university policies and administrative guidelines, allowing the assistant to answer questions across a wide range of academic and campus-related topics.
+The knowledge base contains institutional documents for the fictional **Hyderabad Institute of Technology**, covering the following topics:
 
 ### Topics Covered
 
@@ -124,8 +122,6 @@ The documents simulate real university policies and administrative guidelines, a
 - Grievance Redressal
 - Convocation & Graduation
 
-The knowledge base serves as the single source of truth for the system. Every response is generated using information retrieved from these documents rather than relying solely on the language model's internal knowledge.
-
 ## Technology Stack
 
 | Category | Technology | Purpose |
@@ -146,9 +142,6 @@ The knowledge base serves as the single source of truth for the system. Every re
 The RAG pipeline was evaluated using a manually created benchmark dataset consisting of **50 university-related questions**. Each question was paired with an expected answer to assess the system's retrieval and response generation capabilities.
 
 To obtain a more comprehensive assessment, the project was evaluated using two complementary approaches:
-
-- **BERTScore**, which measures the semantic similarity between the generated answers and the expected answers.
-- **LLM-as-a-Judge**, where an independent language model evaluates each response for correctness, completeness, faithfulness, and overall quality.
 
 ### BERTScore
 
@@ -298,6 +291,8 @@ python create_db.py
 ```
 
 This step only needs to be performed once or whenever the knowledge base is updated.
+
+**Note:** The `persist_directory` and `collection_name` configured in `create_db.py` must match the values used in `app.py`. If they differ, the application will not be able to load the existing vector database.
 
 ---
 

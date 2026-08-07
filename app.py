@@ -14,7 +14,7 @@ project_root = Path(__file__).resolve().parent
 embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
-persist_directory=project_root/"chroma_dbb"
+persist_directory=project_root/"chroma_db"
 # use it to get info from the existing database.
 
 vector_store = Chroma(
