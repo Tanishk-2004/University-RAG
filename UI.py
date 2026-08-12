@@ -1,5 +1,5 @@
 import streamlit as st
-import time
+from app import ask_question
 
 # ==========================================
 # DEFINE PAGE 1: ABOUT
@@ -33,12 +33,9 @@ def page_demo():
     if st.button("Ask"):
         if user_question:
             with st.spinner("Searching documents and generating answer..."):
-                time.sleep(2) 
-                st.success("Answer: Students must maintain a minimum of 75% attendance to sit for exams.")
-                
-                with st.expander("View Retrieved Sources"):
-                    st.info("Source 1: University Attendance Policy.pdf, Page 3")
-                    st.info("Source 2: Student Handbook.txt, Page 12")
+                answer = ask_question(user_question)
+            st.success(answer)
+            
         else:
             st.warning("Please type a question first!")
 

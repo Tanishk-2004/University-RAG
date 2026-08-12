@@ -87,21 +87,24 @@ Answer:
 """)
 
 
-question=input(str("ASK YOUR QUESTION: "))
+def ask_question(question):
 
-response = multi_query_retriever.invoke(question)
+    response = multi_query_retriever.invoke(question)
 
-context="\n=========\n".join(doc.page_content for doc in response) # divide the chunks into sepearate parts 
+    context = "\n=========\n".join(
+        doc.page_content for doc in response
+    )
 
+    final_prompt = prompt.invoke(
+        {
+            "context": context,
+            "question": question
+        }
+    )
 
-final_prompt = prompt.invoke(
-    {
-        "context": context,
-        "question": question
-    }
-)
+    answer = llm.invoke(final_prompt)
 
-answer = llm.invoke(final_prompt)
+   
 
-print(answer.content)
+    return answer.content
 
