@@ -910,10 +910,7 @@ def page_contact() -> None:
 
 def make_page(view, title: str, icon: str):
     """Material icons need a recent Streamlit; fall back to no icon if unsupported."""
-    try:
-        return st.Page(view, title=title, icon=icon)
-    except Exception:
-        return st.Page(view, title=title)
+    return st.Page(view, title=title)
 
 
 st.markdown(THEME, unsafe_allow_html=True)
