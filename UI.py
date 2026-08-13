@@ -103,6 +103,7 @@ THEME = """
 .stApp, [data-testid="stAppViewContainer"] { background: var(--paper); }
 [data-testid="stHeader"] { background: transparent; }
 [data-testid="stDeployButton"], [data-testid="stAppDeployButton"] { display: none; }
+[data-testid="stToolbar"], #MainMenu { display: none !important; }
 footer { visibility: hidden; }
 .block-container, .stMainBlockContainer, [data-testid="stMainBlockContainer"] {
   max-width: 1040px;
