@@ -30,10 +30,10 @@ from app import ask_question  # RAG pipeline — not modified by this file
 CONTACT = {
     "name": "Tanishk",
     "focus": "Python · Retrieval-augmented generation · Applied LLM systems",
-    "linkedin": "",  # TODO: add your LinkedIn URL
-    "github": "",  # TODO: add your GitHub profile URL
-    "email": "",  # TODO: add your email address
-    "repo": "https://github.com/Tanishk-2004/hyderabad-institute-rag",  # from README
+    "linkedin": "https://www.linkedin.com/in/tanishk-agarwal-78a38b262/", 
+    "github": "https://github.com/Tanishk-2004", 
+    "email": "agarwaltanishk73@gmail.com",  
+    "repo": "https://github.com/Tanishk-2004/University-RAG",  
 }
 
 # Facts below come from the project README; they are shown in the sidebar,
@@ -865,12 +865,11 @@ def handle_submit() -> None:
 # PAGE 3 — CONTACT
 # ==========================================================================
 
-def contact_row(label: str, value: str, href: str = "", hint: str = "") -> str:
-    if value:
-        target = href or value
-        inner = f'<a href="{html.escape(target)}">{html.escape(value)}</a>'
-    else:
-        inner = f'<span class="hit-empty">[ {hint} ]</span>'
+def contact_row(label: str, value: str, href: str = "", display: str = "", hint: str = "") -> str:
+    target = href or value
+    link_text = display or label
+    inner = f'<a href="{html.escape(target)}">{html.escape(link_text)}</a>'
+
     return f'<div class="hit-contact-row"><dt>{label}</dt><dd>{inner}</dd></div>'
 
 
@@ -891,21 +890,12 @@ def page_contact() -> None:
     email = CONTACT["email"]
     markup(
         "<dl class='hit-contact'>"
-        + contact_row("LinkedIn", CONTACT["linkedin"], hint="add LinkedIn URL in UI.py → CONTACT")
-        + contact_row("GitHub", CONTACT["github"], hint="add GitHub URL in UI.py → CONTACT")
-        + contact_row("Email", email, href=f"mailto:{email}" if email else "", hint="add email in UI.py → CONTACT")
-        + contact_row("This project", CONTACT["repo"], hint="add repository URL in UI.py → CONTACT")
+        + contact_row("LinkedIn", CONTACT["linkedin"], display="View Profile")
+        + contact_row("GitHub", CONTACT["github"], display="View Profile")
+        + contact_row("Email", email, href=f"mailto:{email}" if email else "", display=email)
+        + contact_row("This project", CONTACT["repo"], display="University-RAG")
         + "</dl>"
     )
-
-    markup(
-        """
-        <hr class="hit-rule" />
-        <p class="hit-footer">Placeholders above are marked in brackets — fill in the CONTACT
-        dictionary at the top of UI.py and they become live links.</p>
-        """
-    )
-
 
 # ==========================================================================
 # NAVIGATION
