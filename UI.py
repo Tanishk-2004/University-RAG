@@ -154,17 +154,19 @@ footer { visibility: hidden; }
 }
 .stFormSubmitButton > button, .stButton > button[kind="primary"],
 [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #F6F8FB;
+  background: #f5d4d4;
+  border: 1px solid #752C36; 
+  color: #0F172A; 
   padding: .6rem 1.6rem;
   letter-spacing: .01em;
+  border-radius: 6px; 
+  font-weight: 500;
 }
 .stFormSubmitButton > button:hover, .stButton > button[kind="primary"]:hover,
 [data-testid="stBaseButton-primary"]:hover, [data-testid="stBaseButton-primaryFormSubmit"]:hover {
-  background: var(--ink-hover);
-  border-color: var(--ink-hover);
-  color: #FFFFFF;
+  background: #f4cccc;
+  border-color: #752C36;
+  color: #0F172A;
 }
 .stButton > button:focus-visible, .stFormSubmitButton > button:focus-visible {
   outline: 2px solid var(--verdigris);
