@@ -53,6 +53,8 @@ EXAMPLES = [
     ("Grading & examinations", "How are internal and external marks combined into the final grade?"),
     ("Fees & refunds", "What is the refund policy if a student withdraws after paying tuition fees?"),
     ("Internships & NOC", "Do I need a No Objection Certificate for an internship during the semester?"),
+    ("Library borrowing", "How many physical books can a 4th-year B.Tech student borrow from the central library simultaneously?"),
+    ("Campus speed limit", "What is the absolute maximum speed limit for vehicles driven within the HIT campus boundary?"),
 ]
 
 QUESTION_KEY = "hit_question"
