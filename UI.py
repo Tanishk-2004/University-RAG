@@ -111,6 +111,16 @@ footer { visibility: hidden; }
   padding-bottom: 4.5rem;
 }
 
+/* ---------- spinner ---------- */
+[data-testid="stSpinner"] {
+    color: var(--ink) !important;
+}
+
+[data-testid="stSpinner"] svg {
+    color: var(--ink) !important;
+    fill: var(--ink) !important;
+}
+
 /* ---------- base type ---------- */
 .stApp, .stApp p, .stApp li, .stApp label, .stApp button, .stApp input, .stApp textarea,
 .stApp [data-testid="stMarkdownContainer"] {
@@ -766,7 +776,7 @@ def render_result() -> None:
     with st.container(border=True):
         # Marker element: hidden, and used by CSS to scope the answer card styling.
         markup('<span class="hit-marker"></span>')
-        markup(f'<p class="hit-question-echo">Answer · {html.escape(result["question"])}</p>')
+        markup(f'<p class="hit-question-echo">Answer </p>')
         st.markdown(answer)
         markup(
             f'<p class="hit-meta">{result["elapsed"]:.1f}s · retrieval {PIPELINE["retrieval"]} '
