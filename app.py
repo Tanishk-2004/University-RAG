@@ -95,6 +95,7 @@ def ask_question(question):
         doc.page_content for doc in response
     )
 
+
     final_prompt = prompt.invoke(
         {
             "context": context,
@@ -106,5 +107,5 @@ def ask_question(question):
 
    
 
-    return answer.content
+    return {"answer":answer.content,"source_documents":response}
 
