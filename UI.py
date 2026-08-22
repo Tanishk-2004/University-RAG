@@ -1,13 +1,6 @@
 """
 Front end for the Hyderabad Institute of Technology RAG assistant.
 
-This module owns presentation only. Retrieval and generation stay in app.py,
-which is imported and called through ask_question() exactly as before:
-
-    question -> UI.py -> ask_question() -> app.py -> Chroma / retriever
-             -> Groq LLM -> answer (+ sources) -> UI.py
-
-Run with:  streamlit run UI.py
 """
 
 from __future__ import annotations
@@ -18,15 +11,14 @@ import time
 
 import streamlit as st
 
-from app import ask_question  # RAG pipeline — not modified by this file
+from app import ask_question  
 
 
-# ==========================================================================
+
 # CONFIGURATION
-# ==========================================================================
 
-# Fill these in and nothing else needs to change on the Contact page.
-# Empty values render as a clearly marked placeholder instead of a dead link.
+
+
 CONTACT = {
     "name": "Tanishk",
     "focus": "Python · Retrieval-augmented generation · Applied LLM systems",
@@ -36,8 +28,7 @@ CONTACT = {
     "repo": "https://github.com/Tanishk-2004/University-RAG",  
 }
 
-# Facts below come from the project README; they are shown in the sidebar,
-# the About page and the answer metadata line.
+
 PIPELINE = {
     "documents": "20 policy documents",
     "pages": "~180 pages",
@@ -47,7 +38,7 @@ PIPELINE = {
     "store": "Chroma, persistent",
 }
 
-# Short labels for scanning, full questions for the input.
+
 EXAMPLES = [
     ("Attendance & condonation", "What is the minimum attendance requirement, and how does condonation work?"),
     ("Grading & examinations", "How are internal and external marks combined into the final grade?"),
@@ -70,14 +61,10 @@ st.set_page_config(
 )
 
 
-# ==========================================================================
+
 # DESIGN SYSTEM
-# ==========================================================================
-# Palette: cool archival paper as the foundation, deep navy ink for structure
-# and primary actions, a muted verdigris green as the secondary (verification,
-# focus states) and oxblood used sparingly as the accent (answer rule, active
-# nav, source markers). Type: Newsreader for display, IBM Plex Sans for the
-# interface, IBM Plex Mono for labels and figures.
+
+
 
 THEME = """
 <style>
@@ -221,12 +208,7 @@ footer { visibility: hidden; }
 [data-testid="stExpander"] summary:hover p { color: var(--ink); }
 .stApp code { font-family: var(--mono); font-size: .82rem; }
 
-/* ---------- answer card ----------
-   Scoped to the one container that holds the hidden .hit-marker element, so no
-   other container is affected. Two selector families are listed because
-   Streamlit exposes these nodes by class and by data-testid, and older builds
-   add an extra border wrapper. Browsers without :has() fall back to
-   Streamlit's own bordered container, which still reads as a card. */
+/* ---------- answer card ---------- */
 .hit-marker { display: none; }
 .stElementContainer:has(> .stMarkdown .hit-marker),
 [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .hit-marker) { display: none; }
@@ -524,9 +506,9 @@ def sidebar_panel() -> None:
         )
 
 
-# ==========================================================================
+
 # PAGE 1 — ABOUT PROJECT
-# ==========================================================================
+
 
 def page_about() -> None:
     markup(
@@ -648,9 +630,9 @@ def page_about() -> None:
     footer_note()
 
 
-# ==========================================================================
+
 # PAGE 2 — LIVE DEMO
-# ==========================================================================
+
 
 def normalise_response(raw):
     """
@@ -776,7 +758,7 @@ def render_result() -> None:
 
     markup('<div class="hit-section-tight"></div>')
     with st.container(border=True):
-        # Marker element: hidden, and used by CSS to scope the answer card styling.
+    
         markup('<span class="hit-marker"></span>')
         markup(f'<p class="hit-question-echo">Answer </p>')
         st.markdown(answer)
@@ -859,8 +841,8 @@ def handle_submit() -> None:
     started = time.perf_counter()
     with st.spinner("Searching the knowledge base and drafting an answer…"):
         try:
-            raw = ask_question(question)  # unchanged call into app.py
-        except Exception as exc:  # surfaced to the user, never swallowed
+            raw = ask_question(question)  # Call goes to app.py
+        except Exception as exc:  
             st.session_state[ERROR_KEY] = f"{type(exc).__name__}: {exc}"
             return
 
@@ -873,9 +855,9 @@ def handle_submit() -> None:
     }
 
 
-# ==========================================================================
+ 
 # PAGE 3 — CONTACT
-# ==========================================================================
+
 
 def contact_row(label: str, value: str, href: str = "", display: str = "", hint: str = "") -> str:
     target = href or value
@@ -909,9 +891,9 @@ def page_contact() -> None:
         + "</dl>"
     )
 
-# ==========================================================================
+
 # NAVIGATION
-# ==========================================================================
+
 
 def make_page(view, title: str, icon: str):
     """Material icons need a recent Streamlit; fall back to no icon if unsupported."""
