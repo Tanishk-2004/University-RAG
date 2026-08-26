@@ -11,7 +11,9 @@ import time
 
 import streamlit as st
 
-from app import ask_question  
+from app import ask_question 
+from pathlib import Path
+from add_document import add_document 
 
 
 
@@ -826,6 +828,40 @@ def page_demo() -> None:
         handle_submit()
 
     render_result()
+    section(
+        "Add to knowledge base",
+        "Upload a PDF to expand the existing knowledge base.",
+        tight=True,
+    )
+
+    uploaded_file = st.file_uploader(
+        "Upload PDF",
+        type=["pdf"],
+        label_visibility="collapsed",
+    )
+
+    if uploaded_file is not None:
+        if st.button("Add Document", type="primary"):
+            project_root = Path(__file__).resolve().parent
+            knowledge_base = project_root / "knowledge_base"
+            knowledge_base.mkdir(exist_ok=True)
+
+            file_path = knowledge_base / uploaded_file.name
+
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            with st.spinner("Adding document to the knowledge base..."):
+                try:
+                    chunks_added = add_document(file_path)
+
+                    st.success(
+                        f"{uploaded_file.name} added successfully. "
+                        f"{chunks_added} chunks indexed."
+                    )
+
+                except Exception as exc:
+                    st.error(f"Could not add document: {type(exc).__name__}: {exc}")
     footer_note()
 
 
