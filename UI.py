@@ -853,13 +853,16 @@ def page_demo() -> None:
 
             with st.spinner("Adding document to the knowledge base..."):
                 try:
-                    chunks_added = add_document(file_path)
+                    Result= add_document(file_path)
 
-                    st.success(
-                        f"{uploaded_file.name} added successfully. "
-                        f"{chunks_added} chunks indexed."
-                    )
+                    if Result["status"]=="duplicate":
+                        st.warning("The document is already present. ")
 
+                    else:
+                        st.success(
+                            f"{uploaded_file.name} added successfully. "
+                            f"{Result['chunks']} chunks indexed. "
+                        )
                 except Exception as exc:
                     st.error(f"Could not add document: {type(exc).__name__}: {exc}")
     footer_note()
