@@ -1542,6 +1542,7 @@ def page_contact() -> None:
         rows.append(link_row("Email", f"mailto:{email}", email))
 
     markup('<div class="hit-links">' + "".join(rows) + "</div>")
+    markup('<div style="height: .8rem;"></div>')
 
     markup(
         """
