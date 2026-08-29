@@ -6,6 +6,7 @@ Front end for the Hyderabad Institute of Technology RAG assistant.
 from __future__ import annotations
 
 import html
+import re
 import textwrap
 import time
 
@@ -56,12 +57,78 @@ RESULT_KEY = "hit_result"
 ERROR_KEY = "hit_error"
 NOTICE_KEY = "hit_notice"
 
+# UI-only state added for the loading indicator and the upload / delete resets.
+PENDING_KEY = "hit_pending"
+UPLOAD_ROUND_KEY = "hit_upload_round"
+UPLOAD_FLASH_KEY = "hit_upload_flash"
+DELETE_ROUND_KEY = "hit_delete_round"
+DELETE_FLASH_KEY = "hit_delete_flash"
+
+DELETE_PLACEHOLDER = "Select PDF to remove"
+
+# Upload cap, checked before the file is written to knowledge_base/. The caption
+# under the uploader is derived from this same value, so the number shown and the
+# number enforced can never drift apart. Set to None to drop the check and the
+# caption together (Streamlit's own server.maxUploadSize still applies).
+MAX_UPLOAD_MB = 10
+
 st.set_page_config(
     page_title="HIT Knowledge Assistant",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="locked",
 )
+
+
+def knowledge_base_dir() -> Path:
+    """Folder the PDFs live in — same path the add / delete flows already use."""
+    return Path(__file__).resolve().parent / "knowledge_base"
+
+
+def pdf_sort_key(path: Path):
+    """
+    Deterministic ascending order for display.
+
+    Splitting on digit runs means 2_fees sorts before 10_hostel instead of after
+    it, which plain lexicographic sorting gets wrong. Presentation only — nothing
+    about how PDFs are stored, indexed or deleted depends on this.
+    """
+    parts = re.split(r"(\d+)", path.name)
+    return [int(part) if part.isdigit() else part.lower() for part in parts]
+
+
+def list_knowledge_base_pdfs() -> list[Path]:
+    """Whatever PDFs exist right now. No fixed count is assumed anywhere."""
+    directory = knowledge_base_dir()
+    if not directory.exists():
+        return []
+    files = list(directory.glob("*.pdf"))
+    try:
+        return sorted(files, key=pdf_sort_key)
+    except TypeError:
+        return sorted(files)
+
+
+def document_count_label() -> str:
+    count = len(list_knowledge_base_pdfs())
+    return f"{count} PDF document" if count == 1 else f"{count} PDF documents"
+
+
+def upload_caption() -> str:
+    """Caption under the uploader — always the limit that is actually enforced."""
+    if MAX_UPLOAD_MB is None:
+        return "PDF only"
+    return f"PDF only · up to {MAX_UPLOAD_MB} MB"
+
+
+def oversized(uploaded_file) -> bool:
+    """True when the file is past the cap above. Unknown size never blocks."""
+    if MAX_UPLOAD_MB is None:
+        return False
+    size = getattr(uploaded_file, "size", None)
+    if not isinstance(size, int):
+        return False
+    return size > MAX_UPLOAD_MB * 1024 * 1024
 
 
 
@@ -86,6 +153,8 @@ THEME = """
   --verdigris-soft: #EBF3F0;
   --oxblood: #8B2E3C;
   --oxblood-soft: #F8EEEF;
+  --amber: #B47C1E;
+  --amber-soft: #FBF4E7;
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
@@ -137,6 +206,30 @@ footer { visibility: hidden; }
 }
 [data-testid="stSidebarNav"] a[aria-current="page"] span { color: var(--ink); font-weight: 600; }
 
+/* ---------- sidebar reachability (kept visible on every screen size) ---------- */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 999;
+}
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"] button,
+[data-testid="stExpandSidebarButton"] button,
+[data-testid="stSidebarCollapseButton"] button {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--ink);
+}
+[data-testid="stSidebarCollapsedControl"] button:hover,
+[data-testid="collapsedControl"] button:hover,
+[data-testid="stExpandSidebarButton"] button:hover,
+[data-testid="stSidebarCollapseButton"] button:hover { border-color: var(--ink); }
+
 /* ---------- buttons ---------- */
 .stButton > button, .stFormSubmitButton > button {
   font-family: var(--sans);
@@ -174,6 +267,12 @@ footer { visibility: hidden; }
   outline: 2px solid var(--verdigris);
   outline-offset: 2px;
 }
+.stButton > button:disabled, .stButton > button:disabled:hover {
+  background: var(--rule-soft);
+  border-color: var(--rule);
+  color: var(--slate-soft);
+  cursor: not-allowed;
+}
 
 /* ---------- inputs ---------- */
 [data-baseweb="textarea"], [data-baseweb="input"], [data-baseweb="base-input"] {
@@ -194,12 +293,170 @@ footer { visibility: hidden; }
 .stApp textarea::placeholder { color: var(--slate-soft) !important; }
 [data-testid="InputInstructions"] { display: none; }
 
+/* ---------- select ---------- */
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+  background: var(--card);
+  border-color: var(--rule);
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: .95rem;
+  color: var(--ink);
+  min-height: 2.6rem;
+}
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:hover { border-color: var(--slate-soft); }
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
+  border-color: var(--verdigris);
+  box-shadow: 0 0 0 3px var(--verdigris-soft);
+}
+[data-testid="stSelectbox"] [data-baseweb="select"] div[value] { overflow-wrap: anywhere; }
+/* Chevron and clear control, kept in the same grey family as the rest of the chrome. */
+[data-testid="stSelectbox"] [data-baseweb="select"] svg { color: var(--slate-soft); fill: var(--slate-soft); }
+[data-testid="stSelectbox"] [data-baseweb="select"]:hover svg { color: var(--ink); fill: var(--ink); }
+div[data-baseweb="popover"] [role="listbox"],
+div[data-baseweb="popover"] ul {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(14,26,43,.08);
+  padding: .25rem;
+}
+div[data-baseweb="popover"] li {
+  font-family: var(--sans);
+  font-size: .92rem;
+  color: var(--ink);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+div[data-baseweb="popover"] li:hover { background: var(--rule-soft); }
+div[data-baseweb="popover"] li[aria-selected="true"] { background: var(--oxblood-soft); color: var(--ink); }
+
+/* ---------- tabs ---------- */
+.stTabs [data-baseweb="tab-list"] {
+  gap: .3rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: .35rem;
+  margin-top: 2.25rem;
+  margin-bottom: .5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+.stTabs [data-baseweb="tab"] {
+  height: auto;
+  min-height: 0;
+  padding: .6rem 1.2rem;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--slate);
+  white-space: nowrap;
+  transition: background .15s ease;
+}
+.stTabs [data-baseweb="tab"] p {
+  font-family: var(--sans);
+  font-size: .96rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--slate);
+}
+.stTabs [data-baseweb="tab"]:hover { background: var(--rule-soft); }
+.stTabs [data-baseweb="tab"]:hover p { color: var(--ink); }
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+  background: var(--oxblood-soft);
+  box-shadow: inset 0 -2px 0 var(--oxblood);
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] p { color: var(--ink); font-weight: 600; }
+.stTabs [data-baseweb="tab"]:focus-visible { outline: 2px solid var(--verdigris); outline-offset: 2px; }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: .25rem; }
+
+/* ---------- file uploader ---------- */
+[data-testid="stFileUploaderDropzone"] {
+  background: var(--card);
+  border: 1px dashed var(--rule);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  gap: .9rem;
+}
+[data-testid="stFileUploaderDropzone"]:hover { border-color: var(--verdigris); }
+[data-testid="stFileUploaderDropzoneInstructions"] span {
+  font-family: var(--sans);
+  font-size: .95rem;
+  color: var(--ink);
+}
+/* The stock caption reads "Limit 200MB per file • PDF". It is hidden in both the
+   markups Streamlit has used for it; the real limit is printed under the widget
+   from MAX_UPLOAD_MB instead, so the number shown is the number enforced. */
+[data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
+[data-testid="stFileUploaderDropzoneInstructions"] div > span:last-child:not(:first-child) {
+  display: none !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+  font-family: var(--sans);
+  font-size: .85rem;
+  font-weight: 500;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  white-space: nowrap;
+}
+[data-testid="stFileUploaderDropzone"] button:hover { border-color: var(--ink); color: var(--ink); }
+[data-testid="stFileUploaderFile"] {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  margin-top: .6rem;
+  min-width: 0;
+}
+[data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"] {
+  font-family: var(--sans);
+  font-size: .9rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+[data-testid="stFileUploaderFile"] small { font-family: var(--mono); font-size: .72rem; color: var(--slate-soft); }
+
+/* ---------- alerts ---------- */
+[data-testid="stAlertContainer"] {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--slate-soft);
+  border-radius: 8px;
+  background: var(--card);
+  font-family: var(--sans);
+  font-size: .93rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+[data-testid="stAlertContainer"] p { font-size: .93rem; color: var(--ink); overflow-wrap: anywhere; }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {
+  border-left-color: var(--verdigris);
+  background: var(--verdigris-soft);
+}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {
+  border-left-color: var(--oxblood);
+  background: var(--oxblood-soft);
+}
+
 /* ---------- expanders and code ---------- */
 [data-testid="stExpander"] {
   border: 1px solid var(--rule);
   border-radius: 8px;
   background: var(--card);
   overflow: hidden;
+}
+[data-testid="stExpander"] details { background: var(--card); border: 0; }
+[data-testid="stExpander"] summary {
+  background: var(--rule-soft);
+  border-bottom: 1px solid var(--rule);
+  padding: .7rem 1rem;
+  transition: background .15s ease;
 }
 [data-testid="stExpander"] summary p {
   font-family: var(--mono);
@@ -208,7 +465,14 @@ footer { visibility: hidden; }
   text-transform: uppercase;
   color: var(--slate);
 }
+[data-testid="stExpander"] summary:hover { background: var(--verdigris-soft); }
 [data-testid="stExpander"] summary:hover p { color: var(--ink); }
+[data-testid="stExpander"] summary:focus-visible { outline: 2px solid var(--verdigris); outline-offset: -2px; }
+[data-testid="stExpander"] details[open] > summary { background: var(--card); }
+/* Chevron on the right, matched to the label rather than left at the Streamlit blue. */
+[data-testid="stExpander"] summary svg { color: var(--slate-soft); fill: var(--slate-soft); }
+[data-testid="stExpander"] summary:hover svg { color: var(--ink); fill: var(--ink); }
+[data-testid="stExpanderDetails"] { background: var(--card); padding: 1rem 1.1rem 1.1rem; }
 .stApp code { font-family: var(--mono); font-size: .82rem; }
 
 /* ---------- answer card ---------- */
@@ -283,6 +547,37 @@ footer { visibility: hidden; }
 .hit-rule { height: 1px; background: var(--rule); border: 0; margin: 2.5rem 0 0; }
 .hit-accent-rule { width: 46px; height: 2px; background: var(--oxblood); margin: 0 0 1.5rem; }
 
+/* ---------- loading state ---------- */
+.hit-loading {
+  display: flex;
+  align-items: flex-start;
+  gap: .9rem;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--verdigris);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 1rem 1.2rem;
+}
+.hit-loading-spin {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: .15rem;
+  border-radius: 50%;
+  border: 2px solid var(--rule);
+  border-top-color: var(--verdigris);
+  animation: hit-spin .8s linear infinite;
+}
+@keyframes hit-spin { to { transform: rotate(360deg); } }
+.hit-loading div { min-width: 0; }
+.hit-loading p { margin: 0; font-size: .95rem; line-height: 1.6; color: var(--ink); }
+.hit-loading .hit-loading-note {
+  font-family: var(--mono);
+  font-size: .74rem;
+  color: var(--slate-soft);
+  margin-top: .35rem;
+}
+
 /* ---------- record strip ---------- */
 .hit-record {
   display: grid;
@@ -304,6 +599,60 @@ footer { visibility: hidden; }
   margin: 0 0 .35rem;
 }
 .hit-record dd { font-family: var(--sans); font-size: 1.02rem; font-weight: 500; color: var(--ink); margin: 0; }
+
+/* ---------- pipeline flow ---------- */
+.hit-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: .5rem;
+  margin-top: 1.5rem;
+}
+.hit-flow-node {
+  flex: 1 1 150px;
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: .95rem 1rem;
+}
+.hit-flow-node span {
+  display: block;
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--slate-soft);
+  margin: 0 0 .3rem;
+}
+.hit-flow-node b { display: block; font-family: var(--sans); font-size: .97rem; font-weight: 600; color: var(--ink); }
+.hit-flow-node p { margin: .35rem 0 0; font-size: .83rem; line-height: 1.5; color: var(--slate); }
+.hit-flow-node.hit-flow-key { border-color: var(--verdigris); background: var(--verdigris-soft); }
+.hit-flow-node.hit-flow-key span { color: var(--verdigris); }
+.hit-flow-arrow {
+  flex: 0 0 auto;
+  align-self: center;
+  font-family: var(--mono);
+  font-size: .8rem;
+  color: var(--slate-soft);
+}
+
+/* ---------- paired cards ---------- */
+.hit-duo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.hit-card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1.3rem 1.4rem;
+}
+.hit-card .hit-eyebrow { margin-bottom: .55rem; }
+.hit-card h3 { font-family: var(--serif); font-size: 1.14rem; font-weight: 500; margin: 0 0 .4rem; color: var(--ink); }
+.hit-card p { margin: 0; font-size: .9rem; line-height: 1.62; color: var(--slate); }
 
 /* ---------- ledger (ordered steps) ---------- */
 .hit-ledger { border-top: 1px solid var(--rule); margin-top: 1.25rem; }
@@ -380,6 +729,7 @@ footer { visibility: hidden; }
   color: var(--slate);
 }
 .hit-notice.hit-error { border-left-color: var(--oxblood); background: var(--oxblood-soft); color: var(--ink); }
+.hit-notice.hit-key { border-left-color: var(--verdigris); background: var(--verdigris-soft); color: var(--ink); }
 .hit-notice strong { color: var(--ink); }
 
 /* ---------- answer meta + sources ---------- */
@@ -407,28 +757,50 @@ footer { visibility: hidden; }
   line-height: 1.6;
   color: var(--slate);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
   margin: 0;
   background: transparent;
 }
 
 /* ---------- contact ---------- */
-.hit-contact { border-top: 1px solid var(--rule); margin-top: 1.5rem; }
-.hit-contact-row {
-  display: grid;
-  grid-template-columns: minmax(110px, 160px) 1fr;
-  gap: 1rem;
-  padding: .95rem .25rem;
-  border-bottom: 1px solid var(--rule-soft);
-  align-items: baseline;
+.hit-name {
+  font-size: clamp(2.6rem, 8vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -.025em;
+  max-width: none;
+  margin: 0 0 1.4rem;
 }
-.hit-contact-row dt {
+.hit-links { border-top: 1px solid var(--rule); margin: 2.25rem 0 0; }
+.hit-link-row { border-bottom: 1px solid var(--rule-soft); }
+.hit-link-row a {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) 1fr auto;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 1.05rem .35rem;
+  border-bottom: 0;
+  color: var(--ink);
+  transition: background .18s ease, padding-left .18s ease;
+}
+.hit-link-row a:hover { background: var(--rule-soft); padding-left: .75rem; }
+.hit-link-row a:focus-visible { outline: 2px solid var(--verdigris); outline-offset: -2px; }
+.hit-link-label {
   font-family: var(--mono);
   font-size: .72rem;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--slate-soft);
 }
-.hit-contact-row dd { margin: 0; font-size: .98rem; }
+.hit-link-value { font-size: 1rem; color: var(--ink); overflow-wrap: anywhere; }
+.hit-link-row a:hover .hit-link-value { color: var(--verdigris); }
+.hit-link-arrow {
+  font-family: var(--mono);
+  font-size: .95rem;
+  color: var(--slate-soft);
+  transition: transform .18s ease, color .18s ease;
+}
+.hit-link-row a:hover .hit-link-arrow { color: var(--verdigris); transform: translateX(4px); }
 .hit-empty { font-family: var(--mono); font-size: .8rem; color: var(--slate-soft); }
 
 /* ---------- footer ---------- */
@@ -454,11 +826,38 @@ footer { visibility: hidden; }
 .hit-panel dd { margin: .15rem 0 0; font-size: .84rem; color: var(--ink); }
 .hit-wordmark { font-family: var(--serif); font-size: 1.05rem; color: var(--ink); margin: 0 0 .2rem; }
 
+/* ---------- overflow guards ---------- */
+.stApp img, .stApp table { max-width: 100%; }
+[data-testid="stMarkdownContainer"] pre { max-width: 100%; overflow-x: auto; }
+
+@media (max-width: 860px) {
+  [data-testid="stSidebar"] { min-width: 20rem; }
+  .hit-flow-node { flex: 1 1 210px; }
+}
+
 @media (max-width: 640px) {
   .block-container, .stMainBlockContainer { padding-top: 1.75rem; }
   .hit-display { max-width: none; }
   .hit-step { grid-template-columns: 1.9rem 1fr; gap: .75rem; }
-  .hit-stack-row, .hit-contact-row { grid-template-columns: 1fr; gap: .2rem; }
+  .hit-stack-row { grid-template-columns: 1fr; gap: .2rem; }
+  [data-testid="stSidebar"] { min-width: 82vw !important; max-width: 92vw !important; }
+  .stTabs [data-baseweb="tab-list"] { margin-top: 1.5rem; }
+  .stTabs [data-baseweb="tab"] { padding: .55rem .9rem; }
+  .stTabs [data-baseweb="tab"] p { font-size: .9rem; }
+  .stButton > button p, .stFormSubmitButton > button p { white-space: normal; overflow-wrap: anywhere; }
+  [data-testid="stFileUploaderDropzone"] { flex-direction: column; align-items: flex-start; }
+  [data-testid="stFileUploaderDropzone"] button { width: 100%; }
+  .hit-record { grid-template-columns: 1fr 1fr; }
+  .hit-figures { grid-template-columns: 1fr; }
+  .hit-flow { flex-direction: column; }
+  .hit-flow-arrow { transform: rotate(90deg); }
+  .hit-duo { grid-template-columns: 1fr; }
+  .hit-link-row a { grid-template-columns: 1fr auto; gap: .15rem 1rem; }
+  .hit-link-label { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  .hit-record { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -499,7 +898,7 @@ def sidebar_panel() -> None:
             <p class="hit-wordmark">HIT Knowledge Assistant</p>
             <p class="hit-eyebrow" style="margin:0">Retrieval-augmented generation</p>
             <dl>
-            <dt>Knowledge base</dt><dd>{PIPELINE['documents']} · {PIPELINE['pages']}</dd>
+            <dt>Knowledge base</dt><dd>{document_count_label()}</dd>
             <dt>Retrieval</dt><dd>{PIPELINE['retrieval']}</dd>
             <dt>Vector store</dt><dd>{PIPELINE['store']}</dd>
             <dt>Generation</dt><dd>{PIPELINE['model']}</dd>
@@ -517,16 +916,11 @@ def page_about() -> None:
     markup(
         f"""
         <p class="hit-eyebrow">Portfolio project · Python · LangChain</p>
+        <div class="hit-accent-rule"></div>
         <h1 class="hit-display">Ask a university's rulebook a question, get the answer it actually contains.</h1>
         <p class="hit-lede">A language model on its own has never read your institution's handbooks.
         This assistant searches documents of university policy first, then answers from
         what it found — and says so plainly when the answer is not in there.</p>
-        <div class="hit-record">
-        <div><dt>Source documents</dt><dd>20 PDFs</dd></div>
-        <div><dt>Indexed</dt><dd>~180 pages</dd></div>
-        <div><dt>Policy areas</dt><dd>20 topics</dd></div>
-        <div><dt>Benchmark</dt><dd>50 questions</dd></div>
-        </div>
         """
     )
 
@@ -539,10 +933,45 @@ def page_about() -> None:
         "so every answer traces back to something in the knowledge base.",
     )
 
+    section(
+        "From a PDF to an answer",
+        "Five stages. The first three run once per document, the last two on every question.",
+    )
+    markup(
+        """
+        <div class="hit-flow">
+        <div class="hit-flow-node">
+        <span>Input</span><b>Documents</b>
+        <p>Policy PDFs, uploaded from inside the app.</p>
+        </div>
+        <span class="hit-flow-arrow">→</span>
+        <div class="hit-flow-node"> 
+        <span>Check</span><b>SHA-256</b>
+        <p>A fingerprint of the file, compared before anything is indexed.</p>
+        </div>
+        <span class="hit-flow-arrow">→</span>
+        <div class="hit-flow-node">
+        <span>Store</span><b>Knowledge base</b>
+        <p>Chunks and embeddings, kept in Chroma on disk.</p>
+        </div>
+        <span class="hit-flow-arrow">→</span>
+        <div class="hit-flow-node">
+        <span>Search</span><b>Retrieval</b>
+        <p>MMR and multi-query pull the passages that matter.</p>
+        </div>
+        <span class="hit-flow-arrow">→</span>
+        <div class="hit-flow-node">
+        <span>Output</span><b>Answer</b>
+        <p>Written from those passages, or not at all.</p>
+        </div>
+        </div>
+        """
+    )
+
     section("How a question is answered", tight=False)
     markup(
         """
-        <p class="hit-stage">Stage 1 — Indexing, once per knowledge base</p>
+        <p class="hit-stage">Stage 1 — Indexing, once per document</p>
         <div class="hit-ledger">
         <div class="hit-step"><span>01</span><p><strong>Load and clean.</strong>
         Every PDF is read page by page and stripped of whitespace and formatting artefacts.</p></div>
@@ -573,6 +1002,44 @@ def page_about() -> None:
         """
     )
 
+    section(
+        "The knowledge base is not fixed",
+        "It is edited from the app itself, on the Manage PDFs tab of the live demo. "
+        "Both operations work against the existing index — there is no rebuild step and "
+        "nothing to restart.",
+    )
+    markup(
+        """
+        <div class="hit-duo">
+        <div class="hit-card">
+        <p class="hit-eyebrow">Add</p>
+        <h3>Upload a PDF</h3>
+        <p>A new policy document is chunked, embedded and written into the Chroma store
+        alongside everything already there. It is searchable on the next question.</p>
+        </div>
+        <div class="hit-card">
+        <p class="hit-eyebrow">Delete</p>
+        <h3>Remove a PDF</h3>
+        <p>Pick a document from the list and it leaves the knowledge base along with every
+        chunk it contributed, so retrieval can no longer reach it.</p>
+        </div>
+        </div>
+        """
+    )
+    markup(
+        """
+        <div class="hit-section-tight">
+        <div class="hit-notice hit-key">
+        <strong>The same document cannot be added twice.</strong> Before a file is indexed it is
+        hashed with SHA-256 — a short fingerprint of its contents. If that fingerprint is already
+        in the store, the upload is reported as a duplicate and nothing is written. Renaming a PDF
+        does not get it past the check, because the hash is of what is inside the file, not what it
+        is called.
+        </div>
+        </div>
+        """
+    )
+
     section("What is under it", tight=False)
     markup(
         f"""
@@ -581,6 +1048,8 @@ def page_about() -> None:
         <div class="hit-stack-row"><dt>Documents</dt><dd>PyPDFLoader with RecursiveCharacterTextSplitter</dd></div>
         <div class="hit-stack-row"><dt>Embeddings</dt><dd>all-MiniLM-L6-v2 (Sentence Transformers)</dd></div>
         <div class="hit-stack-row"><dt>Vector store</dt><dd>Chroma, persisted to disk</dd></div>
+        <div class="hit-stack-row"><dt>Indexing</dt><dd>Incremental — documents added and removed without a rebuild</dd></div>
+        <div class="hit-stack-row"><dt>Deduplication</dt><dd>SHA-256 content hash</dd></div>
         <div class="hit-stack-row"><dt>Retrieval</dt><dd>{PIPELINE['retrieval']}</dd></div>
         <div class="hit-stack-row"><dt>Generation</dt><dd>{PIPELINE['model']}</dd></div>
         <div class="hit-stack-row"><dt>Evaluation</dt><dd>BERTScore and LLM-as-a-judge</dd></div>
@@ -605,6 +1074,7 @@ def page_about() -> None:
         """
     )
 
+    markup('<div class="hit-section-tight"></div>')
     with st.expander("Full evaluation detail"):
         markup(
             """
@@ -711,11 +1181,29 @@ def reset_result() -> None:
     st.session_state[RESULT_KEY] = None
     st.session_state[ERROR_KEY] = None
     st.session_state[NOTICE_KEY] = None
+    st.session_state[PENDING_KEY] = None
 
 
 def clear_all() -> None:
     st.session_state[QUESTION_KEY] = ""
     reset_result()
+
+
+def render_loading() -> None:
+    """The searching state. Stays on screen until the backend call returns."""
+    markup(
+        """
+        <div class="hit-section-tight">
+        <div class="hit-loading">
+        <div class="hit-loading-spin"></div>
+        <div>
+        <p>Searching the knowledge base and drafting an answer…</p>
+        <p class="hit-loading-note">Retrieval and generation are still running — the answer appears here when they finish.</p>
+        </div>
+        </div>
+        </div>
+        """
+    )
 
 
 def render_result() -> None:
@@ -763,7 +1251,7 @@ def render_result() -> None:
     with st.container(border=True):
     
         markup('<span class="hit-marker"></span>')
-        markup(f'<p class="hit-question-echo">Answer </p>')
+        markup('<p class="hit-question-echo">Answer</p>')
         st.markdown(answer)
         markup(
             f'<p class="hit-meta">{result["elapsed"]:.1f}s · retrieval {PIPELINE["retrieval"]} '
@@ -785,20 +1273,10 @@ def render_result() -> None:
     st.button("Ask another question", on_click=clear_all)
 
 
-def page_demo() -> None:
-    st.session_state.setdefault(QUESTION_KEY, "")
+# --- Tab 1 — Ask Questions -------------------------------------------------
 
-    markup(
-        """
-        <p class="hit-eyebrow">Live demo</p>
-        <div class="hit-accent-rule"></div>
-        <h1 class="hit-display hit-wide">Put a question to the knowledge base.</h1>
-        <p class="hit-lede">Ask about attendance, grading, fees, hostel rules, placements or any of the
-        other 20 policy areas. The assistant retrieves the relevant passages first and answers from
-        them — if the documents do not cover your question, it will tell you rather than guess.</p>
-        """
-    )
 
+def render_ask_tab() -> None:
     section("Try one of these", tight=True)
     columns = st.columns(2)
     for i, (label, question) in enumerate(EXAMPLES):
@@ -828,21 +1306,85 @@ def page_demo() -> None:
     if submitted:
         handle_submit()
 
-    render_result()
+    # One slot holds either the loading state or the outcome. Writing the
+    # loading state into it clears the previous answer straight away, and the
+    # slot is only rewritten once the backend call below has returned.
+    result_slot = st.empty()
+
+    pending = st.session_state.get(PENDING_KEY)
+    if pending:
+        with result_slot.container():
+            render_loading()
+        run_question(pending)
+
+    with result_slot.container():
+        render_result()
+
+
+def handle_submit() -> None:
+    """Validate the input and queue the question for this same script run."""
+    reset_result()
+    question = (st.session_state.get(QUESTION_KEY) or "").strip()
+
+    if not question:
+        st.session_state[NOTICE_KEY] = "Write a question first — then Ask searches the knowledge base."
+        return
+
+    st.session_state[PENDING_KEY] = question
+
+
+def run_question(question: str) -> None:
+    """Call the RAG pipeline and store the outcome. Backend call is unchanged."""
+    started = time.perf_counter()
+    try:
+        raw = ask_question(question)  # Call goes to app.py
+    except Exception as exc:  
+        st.session_state[ERROR_KEY] = f"{type(exc).__name__}: {exc}"
+        st.session_state[PENDING_KEY] = None
+        return
+
+    answer, sources = normalise_response(raw)
+    st.session_state[RESULT_KEY] = {
+        "question": question,
+        "answer": answer,
+        "sources": sources,
+        "elapsed": time.perf_counter() - started,
+    }
+    st.session_state[PENDING_KEY] = None
+
+
+# --- Tab 2 — Manage PDFs ---------------------------------------------------
+
+
+def render_manage_tab() -> None:
     section(
         "Add to knowledge base",
-        "Upload a PDF to expand the existing knowledge base.",
+        "Upload a PDF to expand the existing knowledge base. Duplicates are caught by "
+        "their SHA-256 hash, so the same document cannot be indexed twice.",
         tight=True,
     )
 
+    # The key changes after a successful add, which is what empties the widget.
     uploaded_file = st.file_uploader(
         "Upload PDF",
         type=["pdf"],
+        key=f"hit_pdf_upload_{st.session_state[UPLOAD_ROUND_KEY]}",
         label_visibility="collapsed",
     )
+    
+
+    upload_flash = st.session_state.pop(UPLOAD_FLASH_KEY, None)
+    if upload_flash:
+        st.success(upload_flash)
 
     if uploaded_file is not None:
-        if st.button("Add Document", type="primary"):
+        if oversized(uploaded_file):
+            # Checked before anything is written to disk or handed to add_document().
+            st.error(
+                f"{uploaded_file.name} is over the {MAX_UPLOAD_MB} MB limit. "
+                "Upload a smaller PDF."
+            )
+        elif st.button("Add Document", type="primary"):
             project_root = Path(__file__).resolve().parent
             knowledge_base = project_root / "knowledge_base"
             knowledge_base.mkdir(exist_ok=True)
@@ -852,6 +1394,7 @@ def page_demo() -> None:
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
+            added_message = None
             with st.spinner("Adding document to the knowledge base..."):
                 try:
                     Result= add_document(file_path)
@@ -860,38 +1403,50 @@ def page_demo() -> None:
                         st.warning("The document is already present. ")
 
                     else:
-                        st.success(
+                        added_message = (
                             f"{uploaded_file.name} added successfully. "
                             f"{Result['chunks']} chunks indexed. "
                         )
                 except Exception as exc:
                     st.error(f"Could not add document: {type(exc).__name__}: {exc}")
-                    
+
+            # Only the successful path resets the uploader.
+            if added_message:
+                st.session_state[UPLOAD_FLASH_KEY] = added_message
+                st.session_state[UPLOAD_ROUND_KEY] += 1
+                st.rerun()
+
     section(
         "Manage knowledge base",
-        "Select a document to remove it from the knowledge base.",
+        "Select a document to remove it from the knowledge base. Listed in ascending order.",
         tight=True,
     )
 
-    project_root = Path(__file__).resolve().parent
-    knowledge_base = project_root / "knowledge_base"
+    pdf_files = list_knowledge_base_pdfs()
 
-    pdf_files = sorted(knowledge_base.glob("*.pdf"))
+    delete_flash = st.session_state.pop(DELETE_FLASH_KEY, None)
 
     if pdf_files:
         selected_pdf = st.selectbox(
             "Select PDF to remove",
-            pdf_files,
-            format_func=lambda path: path.name,
+            [None] + pdf_files,
+            index=0,
+            format_func=lambda path: DELETE_PLACEHOLDER if path is None else path.name,
+            key=f"hit_pdf_delete_{st.session_state[DELETE_ROUND_KEY]}",
+            label_visibility="collapsed",
         )
 
-        if st.button("Remove Document"):
+        if delete_flash:
+            st.success(delete_flash)
+
+        if st.button("Remove Document", disabled=selected_pdf is None) and selected_pdf is not None:
+            deleted_message = None
             with st.spinner("Removing document from the knowledge base..."):
                 try:
                     result = delete_document(selected_pdf)
 
                     if result["status"] == "deleted":
-                        st.success(
+                        deleted_message = (
                             f"{selected_pdf.name} removed successfully. "
                             f"{result['chunks']} chunks deleted."
                         )
@@ -907,72 +1462,92 @@ def page_demo() -> None:
                         f"Could not remove document: "
                         f"{type(exc).__name__}: {exc}"
                     )
+
+            # Only the successful path resets the selection to the placeholder.
+            if deleted_message:
+                st.session_state[DELETE_FLASH_KEY] = deleted_message
+                st.session_state[DELETE_ROUND_KEY] += 1
+                st.rerun()
     else:
+        if delete_flash:
+            st.success(delete_flash)
         st.info("No PDF documents are currently in the knowledge base.")
-       
+
+
+def page_demo() -> None:
+    st.session_state.setdefault(QUESTION_KEY, "")
+    st.session_state.setdefault(PENDING_KEY, None)
+    st.session_state.setdefault(UPLOAD_ROUND_KEY, 0)
+    st.session_state.setdefault(DELETE_ROUND_KEY, 0)
+
+    markup(
+        """
+        <p class="hit-eyebrow">Live demo</p>
+        <div class="hit-accent-rule"></div>
+        <h1 class="hit-display hit-wide">Put a question to the knowledge base.</h1>
+        <p class="hit-lede">Ask about attendance, grading, fees, hostel rules, placements or any of the
+        other 20 policy areas. The assistant retrieves the relevant passages first and answers from
+        them — if the documents do not cover your question, it will tell you rather than guess.</p>
+        """
+    )
+
+    ask_tab, manage_tab = st.tabs(["💬 Ask Questions", "📄 Manage PDFs"])
+
+    with ask_tab:
+        render_ask_tab()
+
+    with manage_tab:
+        render_manage_tab()
+
     footer_note()
-
-
-def handle_submit() -> None:
-    """Validate the input, call the RAG pipeline, and store the outcome."""
-    reset_result()
-    question = (st.session_state.get(QUESTION_KEY) or "").strip()
-
-    if not question:
-        st.session_state[NOTICE_KEY] = "Write a question first — then Ask searches the knowledge base."
-        return
-
-    started = time.perf_counter()
-    with st.spinner("Searching the knowledge base and drafting an answer…"):
-        try:
-            raw = ask_question(question)  # Call goes to app.py
-        except Exception as exc:  
-            st.session_state[ERROR_KEY] = f"{type(exc).__name__}: {exc}"
-            return
-
-    answer, sources = normalise_response(raw)
-    st.session_state[RESULT_KEY] = {
-        "question": question,
-        "answer": answer,
-        "sources": sources,
-        "elapsed": time.perf_counter() - started,
-    }
 
 
  
 # PAGE 3 — CONTACT
 
 
-def contact_row(label: str, value: str, href: str = "", display: str = "", hint: str = "") -> str:
-    target = href or value
-    link_text = display or label
-    inner = f'<a href="{html.escape(target)}">{html.escape(link_text)}</a>'
-
-    return f'<div class="hit-contact-row"><dt>{label}</dt><dd>{inner}</dd></div>'
+def link_row(label: str, href: str, display: str) -> str:
+    """One line in the contact list: label, value, arrow — the whole row is the link."""
+    return (
+        '<div class="hit-link-row">'
+        f'<a href="{html.escape(href)}">'
+        f'<span class="hit-link-label">{html.escape(label)}</span>'
+        f'<span class="hit-link-value">{html.escape(display)}</span>'
+        '<span class="hit-link-arrow">↗</span>'
+        "</a></div>"
+    )
 
 
 def page_contact() -> None:
     markup(
         f"""
-        <p class="hit-eyebrow">Contact</p>
+        <p class="hit-eyebrow">The person behind the project</p>
         <div class="hit-accent-rule"></div>
-        <h1 class="hit-display hit-wide">{html.escape(CONTACT['name'])}</h1>
+        <h1 class="hit-display hit-name">{html.escape(CONTACT['name'])}</h1>
         <p class="hit-lede">I build retrieval and evaluation pipelines in Python. This project is one of
-        them: a knowledge base of institutional documents, a persistent vector store, and a 50-question
-        benchmark used to check that the answers hold up. Happy to talk about the retrieval design,
-        the evaluation setup, or anything else on this site.</p>
-        <p class="hit-eyebrow" style="margin-top:2.5rem">{html.escape(CONTACT['focus'])}</p>
+        them: institutional documents in a persistent vector store, and a 50-question benchmark to check
+        that the answers hold up. Happy to talk about the retrieval design, the evaluation, or anything
+        else on this site.</p>
+        <p class="hit-eyebrow" style="margin:2rem 0 0">{html.escape(CONTACT['focus'])}</p>
         """
     )
 
     email = CONTACT["email"]
+    rows = [
+        link_row("LinkedIn", CONTACT["linkedin"], "Tanishk Agarwal"),
+        link_row("GitHub", CONTACT["github"], "Tanishk-2004"),
+        link_row("This project", CONTACT["repo"], "University-RAG"),
+    ]
+    if email:
+        rows.append(link_row("Email", f"mailto:{email}", email))
+
+    markup('<div class="hit-links">' + "".join(rows) + "</div>")
+
     markup(
-        "<dl class='hit-contact'>"
-        + contact_row("LinkedIn", CONTACT["linkedin"], display="View Profile")
-        + contact_row("GitHub", CONTACT["github"], display="View Profile")
-        + contact_row("Email", email, href=f"mailto:{email}" if email else "", display=email)
-        + contact_row("This project", CONTACT["repo"], display="University-RAG")
-        + "</dl>"
+        """
+        <p class="hit-footer">Built with Streamlit, LangChain and Chroma. The institution is
+        fictional; the retrieval pipeline behind it is not.</p>
+        """
     )
 
 
