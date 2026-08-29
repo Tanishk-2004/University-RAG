@@ -14,6 +14,7 @@ import streamlit as st
 from app import ask_question 
 from pathlib import Path
 from add_document import add_document 
+from delete_document import delete_document
 
 
 
@@ -865,6 +866,50 @@ def page_demo() -> None:
                         )
                 except Exception as exc:
                     st.error(f"Could not add document: {type(exc).__name__}: {exc}")
+                    
+    section(
+        "Manage knowledge base",
+        "Select a document to remove it from the knowledge base.",
+        tight=True,
+    )
+
+    project_root = Path(__file__).resolve().parent
+    knowledge_base = project_root / "knowledge_base"
+
+    pdf_files = sorted(knowledge_base.glob("*.pdf"))
+
+    if pdf_files:
+        selected_pdf = st.selectbox(
+            "Select PDF to remove",
+            pdf_files,
+            format_func=lambda path: path.name,
+        )
+
+        if st.button("Remove Document"):
+            with st.spinner("Removing document from the knowledge base..."):
+                try:
+                    result = delete_document(selected_pdf)
+
+                    if result["status"] == "deleted":
+                        st.success(
+                            f"{selected_pdf.name} removed successfully. "
+                            f"{result['chunks']} chunks deleted."
+                        )
+                    elif result["status"] == "not_found":
+                        st.warning(
+                            "The document was not found in the vector database."
+                        )
+                    else:
+                        st.error("Could not remove the document.")
+
+                except Exception as exc:
+                    st.error(
+                        f"Could not remove document: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+    else:
+        st.info("No PDF documents are currently in the knowledge base.")
+       
     footer_note()
 
 
