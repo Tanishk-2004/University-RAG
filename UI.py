@@ -909,7 +909,7 @@ def sidebar_panel() -> None:
 
 
 
-# PAGE 1 — ABOUT PROJECT
+# PAGE 1 — ABOUT 
 
 
 def page_about() -> None:
@@ -1004,7 +1004,7 @@ def page_about() -> None:
 
     section(
         "The knowledge base is not fixed",
-        "It is edited from the app itself, on the Manage PDFs tab of the live demo. "
+        "It is edited from the app itself, on the Manage PDFs tab of the Chat. "
         "Both operations work against the existing index — there is no rebuild step and "
         "nothing to restart.",
     )
@@ -1104,7 +1104,7 @@ def page_about() -> None:
 
 
 
-# PAGE 2 — LIVE DEMO
+# PAGE 2 — CHAT
 
 
 def normalise_response(raw):
@@ -1418,7 +1418,7 @@ def render_manage_tab() -> None:
 
     section(
         "Manage knowledge base",
-        "Select a document to remove it from the knowledge base. Listed in ascending order.",
+        "Select a document to remove it from the knowledge base.",
         tight=True,
     )
 
@@ -1482,7 +1482,7 @@ def page_demo() -> None:
 
     markup(
         """
-        <p class="hit-eyebrow">Live demo</p>
+        <p class="hit-eyebrow">Chat</p>
         <div class="hit-accent-rule"></div>
         <h1 class="hit-display hit-wide">Put a question to the knowledge base.</h1>
         <p class="hit-lede">Ask about attendance, grading, fees, hostel rules, placements or any of the
@@ -1564,8 +1564,8 @@ sidebar_panel()
 
 pg = st.navigation(
     [
-        make_page(page_about, "About Project", ":material/article:"),
-        make_page(page_demo, "Live Demo", ":material/forum:"),
+        make_page(page_about, "About", ":material/article:"),
+        make_page(page_demo, "Chat", ":material/forum:"),
         make_page(page_contact, "Contact", ":material/alternate_email:"),
     ]
 )
