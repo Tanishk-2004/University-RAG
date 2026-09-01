@@ -12,8 +12,7 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# Vector Database
-chroma_db/
+
 
 # VS Code
 .vscode/
