@@ -1653,6 +1653,7 @@ def page_role() -> None:
         st.button(
             "Continue as User",
             key="hit_role_user",
+            type="primary",
             use_container_width=True,
             on_click=choose_role,
             args=(USER_ROLE,),
