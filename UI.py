@@ -64,6 +64,11 @@ UPLOAD_FLASH_KEY = "hit_upload_flash"
 DELETE_ROUND_KEY = "hit_delete_round"
 DELETE_FLASH_KEY = "hit_delete_flash"
 
+# Role chosen on the first screen of a session. Session state only — no auth.
+ROLE_KEY = "hit_role"
+ADMIN_ROLE = "Admin"
+USER_ROLE = "User"
+
 DELETE_PLACEHOLDER = "Select PDF to remove"
 
 # Upload cap, checked before the file is written to knowledge_base/. The caption
@@ -860,6 +865,35 @@ div[data-baseweb="popover"] li[aria-selected="true"] { background: var(--oxblood
   .hit-record { grid-template-columns: 1fr; }
 }
 
+/* ---------- sidebar toggle on tablet and mobile ---------- */
+/* Streamlit renders the expand control only while the sidebar is closed, which
+   is the normal state on a phone. It is pinned to a fixed spot here so it can
+   never scroll away or sit under the header, and the page is given matching top
+   padding so nothing hides behind it. Desktop is untouched. */
+@media (max-width: 860px) {
+  [data-testid="stSidebarCollapsedControl"],
+  [data-testid="collapsedControl"],
+  [data-testid="stExpandSidebarButton"] {
+    position: fixed !important;
+    top: .55rem;
+    left: .55rem;
+    z-index: 1000;
+  }
+  [data-testid="stSidebarCollapsedControl"] button,
+  [data-testid="collapsedControl"] button,
+  [data-testid="stExpandSidebarButton"] button,
+  [data-testid="stSidebarCollapseButton"] button {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    box-shadow: 0 1px 3px rgba(14,26,43,.14);
+  }
+  /* The open sidebar sits above the pinned control rather than behind it. */
+  [data-testid="stSidebar"] { z-index: 1001; }
+  .block-container, .stMainBlockContainer, [data-testid="stMainBlockContainer"] {
+    padding-top: 3.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
@@ -1004,7 +1038,7 @@ def page_about() -> None:
 
     section(
         "The knowledge base is not fixed",
-        "It is edited from the app itself, on the Manage PDFs tab of the Chat. "
+        "Admins can edit it from the app itself, on the Manage PDFs tab of the Chat. "
         "Both operations work against the existing index — there is no rebuild step and "
         "nothing to restart.",
     )
@@ -1491,13 +1525,21 @@ def page_demo() -> None:
         """
     )
 
-    ask_tab, manage_tab = st.tabs(["💬 Ask Questions", "📄 Manage PDFs"])
+    # Manage PDFs is rendered only for the Admin role. Tab placement and both
+    # tab bodies are otherwise exactly as before.
+    if current_role() == ADMIN_ROLE:
+        ask_tab, manage_tab = st.tabs(["💬 Ask Questions", "📄 Manage PDFs"])
 
-    with ask_tab:
-        render_ask_tab()
+        with ask_tab:
+            render_ask_tab()
 
-    with manage_tab:
-        render_manage_tab()
+        with manage_tab:
+            render_manage_tab()
+    else:
+        ask_tab, = st.tabs(["💬 Ask Questions"])
+
+        with ask_tab:
+            render_ask_tab()
 
     footer_note()
 
@@ -1524,10 +1566,9 @@ def page_contact() -> None:
         <p class="hit-eyebrow">The person behind the project</p>
         <div class="hit-accent-rule"></div>
         <h1 class="hit-display hit-name">{html.escape(CONTACT['name'])}</h1>
-        <p class="hit-lede">I build retrieval and evaluation pipelines in Python. This project is one of
-        them: institutional documents in a persistent vector store, and a 50-question benchmark to check
-        that the answers hold up. Happy to talk about the retrieval design, the evaluation, or anything
-        else on this site.</p>
+        <p class="hit-lede">Building practical AI applications, exploring intelligent systems, and turning ideas into
+        meaningful, real-world solutions. Have an idea, feedback, or something interesting to
+        discuss? I’d love to hear from you.</p>
         <p class="hit-eyebrow" style="margin:2rem 0 0">{html.escape(CONTACT['focus'])}</p>
         """
     )
@@ -1552,6 +1593,75 @@ def page_contact() -> None:
     )
 
 
+# ROLE SELECTION — shown once per session, before the app itself
+
+
+def current_role():
+    """The role picked for this session, or None if the picker has not run yet."""
+    return st.session_state.get(ROLE_KEY)
+
+
+def choose_role(role: str) -> None:
+    """Callback: remember the role. Session state only — no accounts, no auth."""
+    st.session_state[ROLE_KEY] = role
+
+
+def page_role() -> None:
+    """Standalone first screen. Uses the existing theme classes throughout."""
+    markup(
+        """
+        <p class="hit-eyebrow">HIT Knowledge Assistant</p>
+        <div class="hit-accent-rule"></div>
+        <h1 class="hit-display hit-wide">Choose how you want to enter.</h1>
+        """
+    )
+
+    markup('<div class="hit-section-tight"></div>')
+    admin_col, user_col = st.columns(2)
+
+    with admin_col:
+        markup(
+            """
+            <div class="hit-card">
+            <p class="hit-eyebrow">Admin</p>
+            <h3>Ask and manage</h3>
+            <p>The full assistant, plus the Manage PDFs tab for adding and removing policy
+            documents from the knowledge base.</p>
+            </div>
+            """
+        )
+        st.button(
+            "Continue as Admin",
+            key="hit_role_admin",
+            type="primary",
+            use_container_width=True,
+            on_click=choose_role,
+            args=(ADMIN_ROLE,),
+        )
+
+    with user_col:
+        markup(
+            """
+            <div class="hit-card">
+            <p class="hit-eyebrow">User</p>
+            <h3>Ask questions</h3>
+            <p>The full assistant without the Manage PDFs tab. The knowledge base stays
+            read-only in this mode.</p>
+            </div>
+            """
+        )
+        st.button(
+            "Continue as User",
+            key="hit_role_user",
+            use_container_width=True,
+            on_click=choose_role,
+            args=(USER_ROLE,),
+        )
+
+    markup('<p class="hit-hint">No sign-in — the choice lasts for this browser session only.</p>')
+    footer_note()
+
+
 # NAVIGATION
 
 
@@ -1561,6 +1671,12 @@ def make_page(view, title: str, icon: str):
 
 
 st.markdown(THEME, unsafe_allow_html=True)
+
+# Role gate: the picker stands in for the whole app until a role is chosen.
+if current_role() is None:
+    page_role()
+    st.stop()
+
 sidebar_panel()
 
 pg = st.navigation(
