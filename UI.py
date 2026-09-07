@@ -48,8 +48,11 @@ EXAMPLES = [
     ("Grading & examinations", "How are internal and external marks combined into the final grade?"),
     ("Fees & refunds", "What is the refund policy if a student withdraws after paying tuition fees?"),
     ("Internships & NOC", "Do I need a No Objection Certificate for an internship during the semester?"),
-    ("Library borrowing", "How many physical books can a 4th-year B.Tech student borrow from the central library simultaneously?"),
-    ("Campus speed limit", "What is the absolute maximum speed limit for vehicles driven within the HIT campus boundary?"),
+    ("Cross-document · Attendance + Health", "If a student falls below the minimum attendance requirement because they were sick, what medical documentation is required, and what happens if the medical certificate is found to be forged?"),
+    ("Cross-document · Student Council + Discipline", "How do disciplinary violations affect a student's eligibility to run for Student Council, and what disciplinary circumstances can later lead to removal from an elected position?"),
+    ("Cross-document · Transport + Health", "What medical steps are required after a serious bus accident?"),
+    ("Cross-document · Library + NOC", "Can pending library fines affect internship NOC approval?"),
+
 ]
 
 QUESTION_KEY = "hit_question"
@@ -1520,7 +1523,7 @@ def page_demo() -> None:
         <div class="hit-accent-rule"></div>
         <h1 class="hit-display hit-wide">Put a question to the knowledge base.</h1>
         <p class="hit-lede">Ask about attendance, grading, fees, hostel rules, placements or any of the
-        other 20 policy areas. The assistant retrieves the relevant passages first and answers from
+        other university policies. The assistant retrieves the relevant passages first and answers from
         them — if the documents do not cover your question, it will tell you rather than guess.</p>
         """
     )
