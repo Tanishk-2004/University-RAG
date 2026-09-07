@@ -78,7 +78,7 @@ DELETE_PLACEHOLDER = "Select PDF to remove"
 # under the uploader is derived from this same value, so the number shown and the
 # number enforced can never drift apart. Set to None to drop the check and the
 # caption together (Streamlit's own server.maxUploadSize still applies).
-MAX_UPLOAD_MB = 10
+MAX_UPLOAD_MB = 200
 
 st.set_page_config(
     page_title="HIT Knowledge Assistant",
