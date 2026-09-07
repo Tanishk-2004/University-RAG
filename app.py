@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 from langchain_core.prompts import ChatPromptTemplate
-
+from sentence_transformers import CrossEncoder
 
 project_root = Path(__file__).resolve().parent
 
@@ -15,7 +15,7 @@ embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 persist_directory=project_root/"chroma_db"
-# use it to get info from the existing database.
+
 
 vector_store = Chroma(
     persist_directory=persist_directory,
@@ -31,6 +31,10 @@ retriever = vector_store.as_retriever(
         "fetch_k":15,
         "lambda_mult":1
     }
+)
+
+reranker = CrossEncoder(
+    "BAAI/bge-reranker-base"
 )
 
 
@@ -89,13 +93,38 @@ Answer:
 
 def ask_question(question):
 
+    
     response = multi_query_retriever.invoke(question)
 
+    
+    pairs = [
+        [question, doc.page_content]
+        for doc in response
+    ]
+
+    
+    scores = reranker.predict(pairs)
+
+    
+    ranked_docs = [
+        doc for _, doc in sorted(
+            zip(scores, response),
+            key=lambda x: x[0],
+            reverse=True
+        )
+    ]
+
+    
+    top_docs = ranked_docs[:5]
+
+
     context = "\n=========\n".join(
-        doc.page_content for doc in response
+        doc.page_content for doc in top_docs
     )
 
+    print(context)
 
+    
     final_prompt = prompt.invoke(
         {
             "context": context,
@@ -104,8 +133,9 @@ def ask_question(question):
     )
 
     answer = llm.invoke(final_prompt)
+    
 
-   
+    return {"answer": answer.content, "source_documents": top_docs}
 
-    return {"answer":answer.content,"source_documents":response}
 
+# ask_question("what is the total seat intake for cse")
