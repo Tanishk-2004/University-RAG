@@ -48,10 +48,10 @@ EXAMPLES = [
     ("Grading & examinations", "How are internal and external marks combined into the final grade?"),
     ("Fees & refunds", "What is the refund policy if a student withdraws after paying tuition fees?"),
     ("Internships & NOC", "Do I need a No Objection Certificate for an internship during the semester?"),
-    ("Cross-document · Attendance + Health", "If a student falls below the minimum attendance requirement because they were sick, what medical documentation is required, and what happens if the medical certificate is found to be forged?"),
-    ("Cross-document · Student Council + Discipline", "How do disciplinary violations affect a student's eligibility to run for Student Council, and what disciplinary circumstances can later lead to removal from an elected position?"),
-    ("Cross-document · Transport + Health", "What medical steps are required after a serious bus accident?"),
-    ("Cross-document · Library + NOC", "Can pending library fines affect internship NOC approval?"),
+    ("Cross-document · Attendance & Health", "If a student falls below the minimum attendance requirement because they were sick, what medical documentation is required, and what happens if the medical certificate is found to be forged?"),
+    ("Cross-document · Student Council & Discipline", "How do disciplinary violations affect a student's eligibility to run for Student Council, and what disciplinary circumstances can later lead to removal from an elected position?"),
+    ("Cross-document · Transport & Health", "What medical steps are required after a serious bus accident?"),
+    ("Cross-document · Library & NOC", "Can pending library fines affect internship NOC approval?"),
 
 ]
 
@@ -74,10 +74,7 @@ USER_ROLE = "User"
 
 DELETE_PLACEHOLDER = "Select PDF to remove"
 
-# Upload cap, checked before the file is written to knowledge_base/. The caption
-# under the uploader is derived from this same value, so the number shown and the
-# number enforced can never drift apart. Set to None to drop the check and the
-# caption together (Streamlit's own server.maxUploadSize still applies).
+
 MAX_UPLOAD_MB = 200
 
 st.set_page_config(
